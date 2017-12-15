@@ -1,7 +1,5 @@
 package ScanDataReader;
 
-import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
-
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -11,17 +9,17 @@ import java.util.ArrayList;
  */
 public class ScanFileWriter {
 
-    protected BufferedOutputStream outputStream;
+    BufferedOutputStream outputStream;
 
-    public ScanFileWriter(String fileName) throws IOException {
+    ScanFileWriter(String fileName) throws IOException {
         this(new File(fileName));
     }
 
-    public ScanFileWriter(File file) throws IOException{
+    ScanFileWriter(File file) throws IOException{
         this.outputStream = new BufferedOutputStream(new FileOutputStream(file));
     }
 
-    public void writeFrame(Frame frame, float frameWidth, float frameHeight, float pixelSize) throws IOException{
+    void writeFrame(Frame frame, float frameWidth, float frameHeight, float pixelSize) throws IOException{
         writeInteger(frame.getNumber());
         writeInteger((int) (1e5* frame.getxPosition()));
         writeInteger((int) (1e5* frame.getyPosition()));
@@ -40,7 +38,7 @@ public class ScanFileWriter {
 
     }
 
-    public void writeTracks(Frame frame, float frameWidth, float frameHeight, float pixelSize) throws IOException{
+    private void writeTracks(Frame frame, float frameWidth, float frameHeight, float pixelSize) throws IOException{
 
         ArrayList<Track> tracks = frame.getTracks();
 
@@ -69,45 +67,45 @@ public class ScanFileWriter {
         writeShortArray(y);
     }
 
-    public void writeInteger(int value) throws IOException{
+    void writeInteger(int value) throws IOException{
         ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
         buffer.putInt(value);
         writeBytes(buffer.array());
     }
 
-    public void writeFloat(float value) throws IOException{
+    void writeFloat(float value) throws IOException{
         ByteBuffer buffer = ByteBuffer.allocate(Float.BYTES);
         buffer.putFloat(value);
         writeBytes(buffer.array());
     }
 
-    public void writeShort(short value) throws IOException{
+    private void writeShort(short value) throws IOException{
         ByteBuffer buffer = ByteBuffer.allocate(Short.BYTES);
         buffer.putShort(value);
         writeBytes(buffer.array());
     }
 
-    public void writeByte(byte value) throws IOException{
+    private void writeByte(byte value) throws IOException{
         writeBytes(new byte[] {value});
     }
 
-    public void writeShortArray(short[] array) throws IOException{
+    private void writeShortArray(short[] array) throws IOException{
         for (short value : array) {
             writeShort(value);
         }
     }
 
-    public void writeByteArray(byte[] array) throws IOException{
+    private void writeByteArray(byte[] array) throws IOException{
         for (byte value : array){
             writeByte(value);
         }
     }
 
-    public void writeBytes(byte[] array) throws IOException{
+    private void writeBytes(byte[] array) throws IOException{
         outputStream.write(reverseArray(array));
     }
 
-    public void close() throws IOException{
+    void close() throws IOException{
         this.outputStream.close();
     }
 

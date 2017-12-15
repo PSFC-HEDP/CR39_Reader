@@ -1,6 +1,7 @@
 package ScanDataReader;
 
-import java.awt.geom.Rectangle2D;
+import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
+
 import java.io.*;
 import java.util.ArrayList;
 
@@ -28,73 +29,66 @@ public class ScanData {
 
     private String trailer;
 
-    public Frame[][] frames;       // [yIndex][xIndex] (Starts at top left corner)
+    public Frame[][] frames;       // [yIndex][xIndex] ([0][0] -> Top left corner)
 
 
-    /**
-     * Constructors
-     */
-    // Construct using a filename
-    public ScanData(String filename) throws Exception{
+
+    // *************************************
+    // Constructors using a pre written file
+    // *************************************
+
+    public ScanData(String filename) {
         this(new File(filename));
-
     }
 
-    // Construct using a File Object
-    public ScanData(File file) throws Exception{
+    public ScanData(File file) {
         this.scanFile = file;
 
-        ScanFileReader reader = new ScanFileReader(file);
-        readHeader(reader);
+        // Attempt to build the file reader
+        ScanFileReader reader;
+        try {
+            reader = new ScanFileReader(file);
 
-        while (frames[numYFrames-1][0] == null || frames[numYFrames-1][numXFrames-1] == null){
-            Frame frame = reader.readFrame(this.frameWidth, this.frameHeight, this.pixelSize);
-            frames[frame.getyPositionIndex()][frame.getxPositionIndex()] = frame;
-        }
+            // Try to read the file
+            try {
 
-        readTrailer(reader);
-        reader.close();
-    }
+                // Read the header portion of the file
+                readHeader(reader);
 
-    // Construct using Frame Objects provided externally
-    public ScanData(Frame[][] frames){
-        this.frameHeight = Math.abs(frames[0][0].getyPosition() - frames[1][0].getyPosition());
-        this.frameWidth  = Math.abs(frames[0][1].getxPosition() - frames[0][0].getxPosition());
-
-        this.frames = frames;
-    }
-
-    public void writeToFile() throws Exception{
-        writeToFile(scanFile);
-    }
-
-    // Create a file corresponding to this ScanData object
-    public void writeToFile(File file) throws Exception{
-        this.scanFile = file;
-
-        ScanFileWriter writer = new ScanFileWriter(file);
-        writeHeader(writer);
-
-        for (int i = 0; i < frames.length; i++){
-            for (int j = 0; j < frames[i].length; j++){
-
-                if (i % 2 == 0) {
-                    writer.writeFrame(frames[i][j], frameWidth, frameHeight, pixelSize);
-                }else{
-                    writer.writeFrame(frames[i][frames[i].length - 1 - j], frameWidth, frameHeight, pixelSize);
+                // Keep reading frames until the bottom corner frames are filled (scans always start from the top-left)
+                while (frames[numYFrames - 1][0] == null || frames[numYFrames - 1][numXFrames - 1] == null) {
+                    Frame frame = reader.getNextFrame(this.frameWidth, this.frameHeight, this.pixelSize);
+                    frames[frame.getyPositionIndex()][frame.getxPositionIndex()] = frame;
                 }
 
+                // Read the trailer portion of the file
+                readTrailer(reader);
+            }
+
+            // We had an issue while reading the file (but after opening it)
+            catch (IOException e) {
+                e.printStackTrace();
+                System.exit(-1);
+            }
+
+            // Close the file reader
+            finally {
+                reader.close();
             }
         }
 
-        writeTrailer(writer);
-        writer.close();
+        // We had an issue building the file reader
+        catch (IOException e) {
+            e.printStackTrace();
+            System.exit(-1);
+        }
     }
 
 
-    /**
-     * Reader and writer functions used to constructing ScanData objects and files
-     */
+    // *******************************
+    // Header and trailer read methods
+    // *******************************
+
     private void readHeader(ScanFileReader reader) throws IOException{
         this.versionNumber = reader.getNextInteger();
 
@@ -116,6 +110,96 @@ public class ScanData {
         this.frameHeight = pixelSize * reader.getNextInteger();      // Convert from pixels to cm
     }
 
+    private void readTrailer(ScanFileReader reader) throws IOException{
+        reader.getNextInteger();        // Need to skip the -1 at the end
+
+        this.trailer = new String();
+        while (reader.inputStream.available() > 0){
+            trailer += (char) (short) reader.getNextByte();
+        }
+    }
+
+
+    // **************************************************
+    // Constructor using Frame Objects (for internal use)
+    // **************************************************
+
+    public ScanData(Frame[][] frames){
+        this.frameHeight = Math.abs(frames[0][0].getyPosition() - frames[1][0].getyPosition());
+        this.frameWidth  = Math.abs(frames[0][1].getxPosition() - frames[0][0].getxPosition());
+
+        this.frames = frames;
+    }
+
+
+    // ***********************
+    // Write scan file methods
+    // ***********************
+
+    public void writeToFile() {
+        writeToFile(scanFile);
+    }
+
+    public void writeToFile(File file) {
+        this.scanFile = file;
+
+        // Attempt to build the file writer
+        ScanFileWriter writer;
+        try {
+            writer = new ScanFileWriter(file);
+
+            // Try to write the file
+            try {
+
+                // Write the header portion to the file
+                writeHeader(writer);
+
+                // Loop through and write all of the frame data to the file
+                for (int yPosIndex = 0; yPosIndex < frames.length; yPosIndex++) {
+                    for (int xPosIndex = 0; xPosIndex < frames[yPosIndex].length; xPosIndex++) {
+
+                        // We have to imitate the "sweeping" ordering of the scan systems to be compatible with Fredrick's analysis code
+                        if (yPosIndex % 2 == 0) {
+                            // Left to right
+                            writer.writeFrame(frames[yPosIndex][xPosIndex], frameWidth, frameHeight, pixelSize);
+                        } else {
+                            // Right to left
+                            writer.writeFrame(frames[yPosIndex][frames[yPosIndex].length - 1 - xPosIndex], frameWidth, frameHeight, pixelSize);
+                        }
+
+                    }
+                }
+
+                // Write the trailer portion to the file
+                writeTrailer(writer);
+            }
+
+            // We had an issue writing the file (after opening it)
+            catch (IOException e){
+                e.printStackTrace();
+                System.exit(-1);
+            }
+
+            // Close the file writer
+            finally {
+                writer.close();
+            }
+
+
+        }
+
+        // We had a problem building the file writer
+        catch (IOException e){
+            e.printStackTrace();
+            System.exit(-1);
+        }
+    }
+
+
+    // ********************************
+    // Header and trailer write methods
+    // ********************************
+
     private void writeHeader(ScanFileWriter writer) throws IOException{
         writer.writeInteger(this.versionNumber);
 
@@ -135,23 +219,15 @@ public class ScanData {
         writer.writeInteger((int) (this.frameHeight / this.pixelSize));
     }
 
-    private void readTrailer(ScanFileReader reader) throws IOException{
-        reader.getNextInteger();        // Need to skip the -1 at the end
-
-        this.trailer = new String();
-        while (reader.inputStream.available() > 0){
-            trailer += (char) (short) reader.getNextByte();
-        }
-    }
-
     private void writeTrailer(ScanFileWriter writer) throws IOException{
         writer.writeInteger(-1);
     }
 
 
-    /**
-     * ScanData manipulation functions
-     */
+    // ***************************************
+    // Translate / rotate manipulation methods
+    // ***************************************
+
     public void rotate(double angleInDegrees){
         double angle = Math.toRadians(angleInDegrees);
 
@@ -249,36 +325,59 @@ public class ScanData {
     }
 
 
-    /**
-     * Various getters
-     */
+    // *****************
+    // Get Frame methods
+    // *****************
+
     public Double getFrameArea(){
         return (double) this.frameHeight*this.frameWidth;
     }
 
     public Frame[][] getFrames(AnalysisCuts cuts){
-        int minYIndex = 0, maxYIndex = (frames.length-1);
+        int maxYIndex = 0, minYIndex = (frames.length-1);           // Note the reverse in x and y is because 0,0 is top left (as opposed to bottom left)
+
         int minXIndex = 0, maxXIndex = (frames[0].length - 1);
 
-        if (cuts.isUseYLimits()){
-            for (int i = 0; i < frames.length; i++){
-                if (frames[i][0].getyPosition() < cuts.getMinY())  minYIndex++;
-                if (frames[i][0].getyPosition() > cuts.getMaxY())  maxYIndex--;
+        if (cuts.isIndexMode()){
+
+            if (cuts.isUseYLimits()) {
+                maxYIndex = (frames.length - 1) - (int) cuts.getMaxY();       // Flip it
+                minYIndex = (frames.length - 1) - (int) cuts.getMinY();
+            }
+
+            if (cuts.isUseXLimits()) {
+                minXIndex = (int) cuts.getMinX();
+                maxXIndex = (int) cuts.getMaxX();
+
+
+
             }
         }
 
-        if (cuts.isUseXLimits()){
-            for (int j = 0; j < frames[0].length; j++){
-                if (frames[0][j].getxPosition() < cuts.getMinX())  minXIndex++;
-                if (frames[0][j].getxPosition() > cuts.getMaxX())  maxXIndex--;
+        // We need to determine the indexes using physical units
+        else {
+            if (cuts.isUseYLimits()) {
+                for (int i = 0; i < frames.length; i++) {
+                    if (frames[i][0].getyPosition() < cuts.getMinY()) minYIndex--;
+                    if (frames[i][0].getyPosition() > cuts.getMaxY()) maxYIndex++;
+                }
+            }
+
+            if (cuts.isUseXLimits()) {
+                for (int j = 0; j < frames[0].length; j++) {
+                    if (frames[0][j].getxPosition() < cuts.getMinX()) minXIndex++;
+                    if (frames[0][j].getxPosition() > cuts.getMaxX()) maxXIndex--;
+                }
             }
         }
 
-        int Ny = maxYIndex - minYIndex + 1;
+        int Ny = minYIndex - maxYIndex + 1;
+
         int Nx = maxXIndex - minXIndex + 1;
         Frame[][] filteredFrames = new Frame[Ny][Nx];
         for (int i = 0; i < Ny; i++){
-            int oldI = i + minYIndex;
+            int oldI = i + maxYIndex;
+
             for (int j = 0; j < Nx; j++){
                 int oldJ = j + minXIndex;
                 filteredFrames[i][j] = frames[oldI][oldJ];
@@ -290,6 +389,11 @@ public class ScanData {
     public Frame[][] getFrames(){
         return frames;
     }
+
+
+    // *****************
+    // Get Track methods
+    // *****************
 
     public Track[] getTracks(AnalysisCuts cuts){
         ArrayList<Track> tracks = new ArrayList<>();
@@ -329,6 +433,11 @@ public class ScanData {
 
         return array;
     }
+
+
+    // ***********************
+    // Get binned data methods
+    // ***********************
 
     public XYZData getNxy(AnalysisCuts cuts) throws Exception{
 
@@ -559,25 +668,6 @@ public class ScanData {
 
 
 
-
-    /**
-     * Various setters
-     */
-    public void setTrailer(String trailer) {
-        this.trailer = trailer;
-    }
-
-    /*
-    public void setTracks(Track[] tracks){
-        for (int i = 0; i < frames.length; i++){
-            for (int j = 0; j < frames[i].length; j++){
-                Track[] boundedTracks = getTracksBetweenBounds(tracks, frames[i][j].getBounds());
-                frames[i][j].setTracks(boundedTracks);
-            }
-        }
-    }
-
-
     /**
      * Built in data classes (glorified structs) for storing data
      */
@@ -590,62 +680,6 @@ public class ScanData {
         public double[] xData;
         public double[] yData;
         public double[][] zData;
-        
-        public XYZData rebin(int N){
-            
-            XYZData rebinedData = new XYZData();
-            rebinedData.xData = rebinVector(xData, N);
-            rebinedData.yData = rebinVector(yData, N);
-            rebinedData.zData = rebinMatrix(zData, N);
-            return rebinedData;
-        }
-    }
-
-
-    /**
-     * Convenience rebinning methods for the XYZData objects
-     */
-    private double[] rebinVector(double[] oldVector, int N){
-        
-        int newLength = (int) Math.floor(oldVector.length / (double) N);
-        double[] rebinedVector = new double[newLength];
-        
-        for (int i = 0; i < (oldVector.length - N+1); i += N){
-            int index = (int) Math.floor(i / (double) N);
-            
-            rebinedVector[index] = 0.0;
-            for (int ii = i; ii < i+N; ii++){
-                rebinedVector[index] += oldVector[ii];
-            }
-            rebinedVector[index] /= (double) N;
-        }
-        
-        return rebinedVector;
-    }
-    
-    private double[][] rebinMatrix(double[][] oldMatrix, int N){
-
-        int newYLength = (int) Math.floor(oldMatrix.length / (double) N);
-        int newXLength = (int) Math.floor(oldMatrix[0].length / (double) N);
-
-        double[][] rebinedMatrix = new double[newYLength][newXLength];
-
-        for (int i = 0; i < (oldMatrix.length - N+1); i+=N){
-            int yIndex = (int) Math.floor(i / (double) N);
-            for (int j = 0; j < (oldMatrix[0].length - N+1); j+=N){
-                int xIndex = (int) Math.floor(j / (double) N);
-
-                rebinedMatrix[yIndex][xIndex] = 0.0;
-                for (int ii = i; ii < i+N; ii++){
-                    for (int jj = j; jj < j+N; jj++){
-                        rebinedMatrix[yIndex][xIndex] += oldMatrix[ii][jj];
-                    }
-                }
-                rebinedMatrix[yIndex][xIndex] /= (double) (N*N);
-            }
-        }
-
-        return rebinedMatrix;
     }
 
 }

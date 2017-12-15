@@ -9,17 +9,17 @@ import java.util.ArrayList;
  */
 public class ScanFileReader {
 
-    protected BufferedInputStream inputStream;
+    BufferedInputStream inputStream;
 
-    public ScanFileReader(String fileName) throws IOException{
+    ScanFileReader(String fileName) throws IOException{
         this(new File(fileName));
     }
 
-    public ScanFileReader(File file) throws IOException{
+    ScanFileReader(File file) throws IOException{
         this.inputStream = new BufferedInputStream(new FileInputStream(file));
     }
 
-    public Frame readFrame(float frameWidth, float frameHeight, float pixelSize) throws IOException{
+    Frame getNextFrame(float frameWidth, float frameHeight, float pixelSize) throws IOException{
         Frame frame = new Frame();
         frame.setNumber(getNextInteger());
         frame.setxPosition((float) 1e-5*getNextInteger());
@@ -43,7 +43,7 @@ public class ScanFileReader {
         return frame;
     }
 
-    public ArrayList<Track> readTracks(Frame frame, int numTracks) throws IOException{
+    private ArrayList<Track> readTracks(Frame frame, int numTracks) throws IOException{
 
         /**
          * Grab all of the values to be sorted / converted later
@@ -80,30 +80,30 @@ public class ScanFileReader {
         return tracks;
     }
 
-    public Integer getNextInteger() throws IOException{
+    Integer getNextInteger() throws IOException{
         byte[] bytes = getBytes(Integer.BYTES);
         bytes = reverseArray(bytes);
         return ByteBuffer.wrap(bytes).getInt();
     }
 
-    public Float getNextFloat() throws IOException{
+    Float getNextFloat() throws IOException{
         byte[] bytes = getBytes(Float.BYTES);
         bytes = reverseArray(bytes);
         return ByteBuffer.wrap(bytes).getFloat();
     }
 
-    public Short getNextShort() throws IOException{
+    private Short getNextShort() throws IOException{
         byte[] bytes = getBytes(Short.BYTES);
         bytes = reverseArray(bytes);
         return ByteBuffer.wrap(bytes).getShort();
     }
 
-    public Byte getNextByte() throws IOException{
+    Byte getNextByte() throws IOException{
         byte[] bytes = getBytes(1);
         return bytes[0];
     }
 
-    public Short[] getShortArray(int n) throws IOException{
+    private Short[] getShortArray(int n) throws IOException{
         Short[] array = new Short[n];
         for (int i = 0; i < n; i++){
             array[i] = getNextShort();
@@ -111,17 +111,17 @@ public class ScanFileReader {
         return array;
     }
 
-    public byte[] getBytes(int n) throws IOException{
+    private byte[] getBytes(int n) throws IOException{
         byte[] array = new byte[n];
         inputStream.read(array);
         return array;
     }
 
-    public void skip(int n) throws IOException{
+    private void skip(int n) throws IOException{
         getBytes(n);
     }
 
-    public void close() throws IOException{
+    void close() throws IOException{
         this.inputStream.close();
     }
 

@@ -7,6 +7,11 @@ import java.awt.geom.Rectangle2D;
  */
 public class AnalysisCuts {
 
+    public enum AreaMode {
+        BY_PHYSICAL_LOCATION, BY_INDEX
+    }
+
+    private AreaMode areaMode;
     private double minDiameter, maxDiameter;
     private double minX, maxX;
     private double minY, maxY;
@@ -31,7 +36,35 @@ public class AnalysisCuts {
         return cuts;
     }
 
+    public AnalysisCuts copy() {
+        AnalysisCuts clone = new AnalysisCuts();
+        clone.areaMode = areaMode;
 
+        clone.minDiameter = minDiameter;
+        clone.maxDiameter = maxDiameter;
+
+        clone.minX = minX;
+        clone.maxX = maxX;
+        clone.minY = minY;
+        clone.maxY = maxY;
+
+        clone.minContrast = minContrast;
+        clone.maxContrast = maxContrast;
+
+        clone.minEccentricity = minEccentricity;
+        clone.maxEccentricity = maxEccentricity;
+
+        clone.useAverageContrast = useAverageContrast;
+        clone.useDiameterLimits = useDiameterLimits;
+        clone.useContrastLimits = useContrastLimits;
+        clone.useEccentricityLimits = useEccentricityLimits;
+
+        clone.useXLimits = useXLimits;
+        clone.useYLimits = useYLimits;
+
+        return clone;
+    }
+    
     /**
      * Setters
      */
@@ -53,6 +86,9 @@ public class AnalysisCuts {
         this.maxEccentricity = maxEccentricity;
     }
 
+    public void setAreaMode(AreaMode areaMode) {
+        this.areaMode = areaMode;
+    }
     public void setXLimits(double minX, double maxX){
         useXLimits = true;
         this.minX = minX;
@@ -124,6 +160,14 @@ public class AnalysisCuts {
 
     public double getMaxY() {
         return maxY;
+    }
+
+    public double getAreaLimits(){
+        return (maxY - minY) * (maxX - minX);
+    }
+
+    public boolean isIndexMode(){
+        return areaMode == AreaMode.BY_INDEX;
     }
 
     public int getMinContrast() {
